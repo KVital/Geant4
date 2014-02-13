@@ -1,0 +1,109 @@
+#include "DetectorConstruction.hh"
+#include "DetectorSD.hh"
+
+#include "G4Material.hh"
+#include "G4Box.hh"
+#include "G4Tubs.hh"
+#include "G4Polyhedra.hh"
+#include "G4LogicalVolume.hh"
+#include "G4ThreeVector.hh"
+#include "G4PVPlacement.hh"
+#include "G4RotationMatrix.hh"
+#include "G4NistManager.hh"
+#include "globals.hh"
+#include "G4VisAttributes.hh" 
+#include "G4SDManager.hh"
+#include "G4PVReplica.hh"
+
+DetectorConstruction::DetectorConstruction() {}
+
+DetectorConstruction::~DetectorConstruction() {}
+
+G4VPhysicalVolume* DetectorConstruction::Construct()
+{
+ G4NistManager* nistMan = G4NistManager::Instance();
+ G4Material* vacuum = nistMan->FindOrBuildMaterial("G4_Galactic");
+ G4Material* Air = nistMan->FindOrBuildMaterial("G4_AIR");
+ G4Material* saMaterial = nistMan->FindOrBuildMaterial("G4_Al");
+ G4Material* detMaterial = nistMan->FindOrBuildMaterial("G4_SODIUM_IODIDE");
+ G4Element* Fe = new G4Element("Ferum"  , "Fe", 26, 55.847*g/mole);
+ G4Element* Cr = new G4Element("Chrom"  , "Cr", 24, 51.9961*g/mole);
+ G4Element* Ni = new G4Element("Nikel"  , "Ni", 28, 58.6934*g/mole);
+ G4Element* C = new G4Element("Carbon"  , "C", 6, 12.011*g/mole);
+ G4Element* Mn = new G4Element("Mangan"  , "Mn", 25, 54.93805*g/mole);
+ G4Element* P = new G4Element("Phosphor"  , "P", 15, 30.9737*g/mole);
+ G4Element* S = new G4Element("Sirka"  , "S", 16, 32.066*g/mole);
+ G4Element* Cu = new G4Element("Cuprum"  , "Cu", 29, 63.546*g/mole);
+ G4Material* UnrustIron = new G4Material("UnrustIron", 8*g/cm3, 8);
+ UnrustIron->AddElement(Fe, 70*perCent);
+ UnrustIron->AddElement(Cr, 18*perCent);
+ UnrustIron->AddElement(Ni, 9*perCent);
+ UnrustIron->AddElement(C, 0.08*perCent);
+ UnrustIron->AddElement(Mn, 2*perCent);
+ UnrustIron->AddElement(P, 0.045*perCent);
+ UnrustIron->AddElement(S, 0.03*perCent);
+ UnrustIron->AddElement(Cu, 0.845*perCent);
+
+
+
+
+  G4double gap = 25*cm; // расстояние от источника до детектора
+  
+ //розміри в одиницях елементарної комірки по осях
+G4int nLayersx = 10;
+G4int nLayersy = 10;
+G4int nLayersz = 10;
+ 
+//розмір елементарної комірки
+  G4double size = 1*cm; // сечение сборки - квадрат [size] x [size]
+  
+
+
+  G4Box* world_box = new G4Box("world", 2*m, 2*m, 2*m);
+  // заполняем его воздухом
+  G4LogicalVolume* world_log = new G4LogicalVolume(world_box, Air, "world");
+  // и помещаем в начало координат
+  G4VPhysicalVolume* world_phys = new G4PVPlacement(0, G4ThreeVector(), world_log, "world", 0, false, 0);
+G4double zplane[]={-0.25*m, 0.25*m};
+G4double rin[]={0*m,0*m};
+G4double rout[]={135*mm,135*mm};
+   G4Polyhedra* sample_box = new G4Polyhedra("sample", 0 , 2*pi,6,2, zplane,rin,rout);
+  // образец
+  G4LogicalVolume* sample_log = new G4LogicalVolume(sample_box, saMaterial, "sample");
+  // помещаем его в мировой объем
+  G4VPhysicalVolume* sample_phys = new G4PVPlacement(0, G4ThreeVector(0, 0, 0), sample_log, "sample", world_log, false, 0);
+
+
+G4Box* calor_box23 = new G4Box("calorimeter23", size*nLayersx/2, size*nLayersy/2, size*nLayersz/2);
+  G4LogicalVolume* calor_log23 = new G4LogicalVolume(calor_box23, vacuum, "calorimeter23");
+  G4VPhysicalVolume* calor_phys23 = new G4PVPlacement(0, G4ThreeVector(0, gap + size*nLayersy/2, 0), calor_log23, "calorimeter", world_log, false, 0);
+
+
+G4Box* calor_box2 = new G4Box("calorimeter2", size/2, size*nLayersy/2, size*nLayersz/2);
+  G4LogicalVolume* calor_log2 = new G4LogicalVolume(calor_box2, vacuum, "calorimeter2");
+ // G4VPhysicalVolume* calor_phys2 = new G4PVPlacement(0, G4ThreeVector(0, gap + calorThick/2, 0), calor_log2, "calorimeter", world_log, false, 0);
+ G4PVReplica* calor_phys2  = new G4PVReplica("layer", calor_log2, calor_log23, kXAxis, nLayersx, size);
+
+  G4Box* calor_box = new G4Box("calorimeter", size/2, size*nLayersy/2, size/2);
+  G4LogicalVolume* calor_log = new G4LogicalVolume(calor_box, vacuum, "calorimeter");
+ // G4VPhysicalVolume* calor_phys = new G4PVPlacement(0, G4ThreeVector(0, 0, 0), calor_log, "calorimeter", calor_box2, false, 0);
+  G4PVReplica* calor_phys  = new G4PVReplica("layer", calor_log, calor_log2, kZAxis, nLayersz, size);
+  // слой
+  G4Box* det_box = new G4Box("detector", size/2, size/2, size/2);
+  G4LogicalVolume* det_log = new G4LogicalVolume(det_box, UnrustIron, "layer");
+  G4PVReplica* det_phys = new G4PVReplica("layer", det_log, calor_log, kYAxis, nLayersy, size);
+
+
+  DetectorSD* detectorSD = new DetectorSD("DetectorSD");
+  G4SDManager* sdMan = G4SDManager::GetSDMpointer();
+  sdMan->AddNewDetector(detectorSD);
+  det_log->SetSensitiveDetector(detectorSD);
+  
+ 
+ world_log->SetVisAttributes(G4VisAttributes::Invisible);
+ sample_log->SetVisAttributes(G4VisAttributes(G4Colour::Yellow()));
+ det_log->SetVisAttributes(G4VisAttributes(G4Colour::Blue()));
+  // возвращаем указатель на мировой объем
+  return world_phys;
+}
+
